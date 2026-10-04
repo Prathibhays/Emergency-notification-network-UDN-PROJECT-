@@ -10,15 +10,13 @@ class EmergencyTopology(Topo):
 
     def build(self):
 
-        # -----------------------------
-        # Hosts
-        # -----------------------------
-
+        # Server
         h1 = self.addHost(
             "h1",
             ip="10.0.0.1/24"
         )
 
+        # Clients
         h2 = self.addHost(
             "h2",
             ip="10.0.0.2/24"
@@ -34,53 +32,26 @@ class EmergencyTopology(Topo):
             ip="10.0.0.4/24"
         )
 
-        # -----------------------------
-        # OVS switches
-        # -----------------------------
+        # Switches
+        s1 = self.addSwitch("s1")
+        s2 = self.addSwitch("s2")
 
-        s1 = self.addSwitch(
-            "s1"
-        )
+        # Server to switch
+        self.addLink(h1, s1)
 
-        s2 = self.addSwitch(
-            "s2"
-        )
-
-        # -----------------------------
-        # Links
-        # -----------------------------
-
-        # Server → first switch
-        self.addLink(
-            h1,
-            s1
-        )
-
-        # Inter-switch link
-        # Bottleneck link used for
-        # congestion experiments
+        # Bottleneck link
         self.addLink(
             s1,
             s2,
             cls=TCLink,
-            bw=10
+            bw=10,
+            delay="5ms"
         )
 
-        # Clients → second switch
-        self.addLink(
-            s2,
-            h2
-        )
-
-        self.addLink(
-            s2,
-            h3
-        )
-
-        self.addLink(
-            s2,
-            h4
-        )
+        # Switch to clients
+        self.addLink(s2, h2)
+        self.addLink(s2, h3)
+        self.addLink(s2, h4)
 
 
 def run():
@@ -95,7 +66,6 @@ def run():
         autoSetMacs=True
     )
 
-    # Connect switches to Person 2's Ryu controller
     controller = RemoteController(
         "c0",
         ip="127.0.0.1",
@@ -107,13 +77,10 @@ def run():
     info("*** Starting network\n")
     net.start()
 
-    info("*** Network started\n")
-
     info("*** Testing connectivity\n")
     net.pingAll()
 
     info("*** Starting Mininet CLI\n")
-
     CLI(net)
 
     info("*** Stopping network\n")
@@ -121,6 +88,5 @@ def run():
 
 
 if __name__ == "__main__":
-
     setLogLevel("info")
     run()
