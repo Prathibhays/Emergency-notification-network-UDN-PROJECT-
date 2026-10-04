@@ -1,36 +1,56 @@
 import subprocess
 import time
 
+
+# IP addresses of the three clients
 CLIENTS = [
     "10.0.0.2",
     "10.0.0.3",
     "10.0.0.4"
 ]
 
+# Background UDP traffic per client
 BANDWIDTH = "5M"
-DURATION = 20
+
+# How long congestion will run
+DURATION = 30
 
 
 def start_congestion():
+
     processes = []
 
-    print("\nStarting heavy UDP background traffic...\n")
+    print("======================================")
+    print("STARTING UDP BACKGROUND TRAFFIC")
+    print("======================================")
 
     for client in CLIENTS:
-        print(f"Starting traffic to {client}")
 
         command = [
             "iperf3",
-            "-c", client,
+            "-c",
+            client,
             "-u",
-            "-b", BANDWIDTH,
-            "-t", str(DURATION)
+            "-b",
+            BANDWIDTH,
+            "-t",
+            str(DURATION)
         ]
 
+        print(f"Starting traffic: h1 -> {client}")
+
         process = subprocess.Popen(command)
+
         processes.append(process)
 
-    print("\nCongestion generated.")
+    print()
+    print("Congestion traffic started.")
+    print(f"Bandwidth per client : {BANDWIDTH}")
+    print(f"Number of clients    : {len(CLIENTS)}")
+    print(f"Total attempted rate : 15 Mbps")
+    print(f"Duration             : {DURATION} seconds")
+    print()
+
     return processes
 
 
@@ -44,7 +64,7 @@ def stop_congestion(processes):
     print("Congestion stopped.")
 
 
-if __name__ == "__main__":
+def main():
 
     processes = start_congestion()
 
@@ -52,7 +72,11 @@ if __name__ == "__main__":
         time.sleep(DURATION)
 
     except KeyboardInterrupt:
-        pass
+        print("\nInterrupted by user.")
 
     finally:
         stop_congestion(processes)
+
+
+if __name__ == "__main__":
+    main()
