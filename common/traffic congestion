@@ -1,18 +1,15 @@
 import subprocess
 import time
+import sys
 
 
-# IP addresses of the three clients
 CLIENTS = [
     "10.0.0.2",
     "10.0.0.3",
     "10.0.0.4"
 ]
 
-# Background UDP traffic per client
 BANDWIDTH = "5M"
-
-# How long congestion will run
 DURATION = 30
 
 
@@ -20,9 +17,9 @@ def start_congestion():
 
     processes = []
 
-    print("======================================")
-    print("STARTING UDP BACKGROUND TRAFFIC")
-    print("======================================")
+    print("=" * 60)
+    print("STARTING CONGESTION")
+    print("=" * 60)
 
     for client in CLIENTS:
 
@@ -37,29 +34,27 @@ def start_congestion():
             str(DURATION)
         ]
 
-        print(f"Starting traffic: h1 -> {client}")
+        print(f"h1 -> {client}: {BANDWIDTH}")
 
-        process = subprocess.Popen(command)
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
 
         processes.append(process)
 
-    print()
-    print("Congestion traffic started.")
-    print(f"Bandwidth per client : {BANDWIDTH}")
-    print(f"Number of clients    : {len(CLIENTS)}")
-    print(f"Total attempted rate : 15 Mbps")
-    print(f"Duration             : {DURATION} seconds")
-    print()
+    print(f"\nCongestion running for {DURATION} seconds.")
 
     return processes
 
 
 def stop_congestion(processes):
 
-    print("\nStopping congestion...")
-
     for process in processes:
-        process.terminate()
+
+        if process.poll() is None:
+            process.terminate()
 
     print("Congestion stopped.")
 
@@ -69,12 +64,22 @@ def main():
     processes = start_congestion()
 
     try:
-        time.sleep(DURATION)
+
+        for remaining in range(DURATION, 0, -1):
+
+            print(
+                f"\rCongestion remaining: {remaining:2d}s",
+                end=""
+            )
+
+            time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\nInterrupted by user.")
+
+        print("\nInterrupted.")
 
     finally:
+
         stop_congestion(processes)
 
 
