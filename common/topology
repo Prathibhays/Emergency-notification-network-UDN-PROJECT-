@@ -1,80 +1,126 @@
-from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.node import RemoteController, OVSSwitch
-from mininet.link import TCLink
 from mininet.cli import CLI
-from mininet.log import setLogLevel
+from mininet.log import setLogLevel, info
+from mininet.link import TCLink
+from mininet.topo import Topo
 
 
-class EmergencyTopo(Topo):
+class EmergencyTopology(Topo):
 
     def build(self):
 
-        s1 = self.addSwitch('s1')
-        s2 = self.addSwitch('s2')
+        # -----------------------------
+        # Hosts
+        # -----------------------------
 
-        h1 = self.addHost('h1', ip='10.0.0.1/24')
-        h2 = self.addHost('h2', ip='10.0.0.2/24')
-        h3 = self.addHost('h3', ip='10.0.0.3/24')
-        h4 = self.addHost('h4', ip='10.0.0.4/24')
-
-        # Switch-to-switch link
-        self.addLink(
-            s1, s2,
-            cls=TCLink,
-            bw=10,
-            delay='5ms'
+        h1 = self.addHost(
+            "h1",
+            ip="10.0.0.1/24"
         )
 
-        # Server link - intentionally limited
-        self.addLink(
-            h1, s2,
-            cls=TCLink,
-            bw=2,
-            delay='10ms',
-            max_queue_size=20
+        h2 = self.addHost(
+            "h2",
+            ip="10.0.0.2/24"
         )
 
-        # Client links
-        self.addLink(h2, s2, cls=TCLink, bw=10)
-        self.addLink(h3, s2, cls=TCLink, bw=10)
-        self.addLink(h4, s2, cls=TCLink, bw=10)
+        h3 = self.addHost(
+            "h3",
+            ip="10.0.0.3/24"
+        )
+
+        h4 = self.addHost(
+            "h4",
+            ip="10.0.0.4/24"
+        )
+
+        # -----------------------------
+        # OVS switches
+        # -----------------------------
+
+        s1 = self.addSwitch(
+            "s1"
+        )
+
+        s2 = self.addSwitch(
+            "s2"
+        )
+
+        # -----------------------------
+        # Links
+        # -----------------------------
+
+        # Server → first switch
+        self.addLink(
+            h1,
+            s1
+        )
+
+        # Inter-switch link
+        # Bottleneck link used for
+        # congestion experiments
+        self.addLink(
+            s1,
+            s2,
+            cls=TCLink,
+            bw=10
+        )
+
+        # Clients → second switch
+        self.addLink(
+            s2,
+            h2
+        )
+
+        self.addLink(
+            s2,
+            h3
+        )
+
+        self.addLink(
+            s2,
+            h4
+        )
 
 
-topos = {
-    'emergency': EmergencyTopo
-}
+def run():
 
-
-if __name__ == '__main__':
-
-    setLogLevel('info')
-
-    topo = EmergencyTopo()
+    topo = EmergencyTopology()
 
     net = Mininet(
         topo=topo,
-        switch=OVSSwitch,
         controller=None,
-        link=TCLink
+        switch=OVSSwitch,
+        link=TCLink,
+        autoSetMacs=True
     )
 
-    # Change port if your Ryu teammate uses another port
-    net.addController(
-        'c0',
-        controller=RemoteController,
-        ip='127.0.0.1',
+    # Connect switches to Person 2's Ryu controller
+    controller = RemoteController(
+        "c0",
+        ip="127.0.0.1",
         port=6653
     )
 
+    net.addController(controller)
+
+    info("*** Starting network\n")
     net.start()
 
-    print("\n*** Emergency notification topology started ***")
-    print("h1 = Server")
-    print("h2 = Client 1")
-    print("h3 = Client 2")
-    print("h4 = Client 3")
+    info("*** Network started\n")
+
+    info("*** Testing connectivity\n")
+    net.pingAll()
+
+    info("*** Starting Mininet CLI\n")
 
     CLI(net)
 
+    info("*** Stopping network\n")
     net.stop()
+
+
+if __name__ == "__main__":
+
+    setLogLevel("info")
+    run()
