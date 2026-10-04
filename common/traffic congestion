@@ -8,16 +8,15 @@ CLIENTS = [
 ]
 
 BANDWIDTH = "5M"
-DURATION = 20
+DURATION = 30
 
 
 def start_congestion():
     processes = []
 
-    print("\nStarting heavy UDP background traffic...\n")
+    print("Starting congestion...")
 
     for client in CLIENTS:
-        print(f"Starting traffic to {client}")
 
         command = [
             "iperf3",
@@ -27,16 +26,15 @@ def start_congestion():
             "-t", str(DURATION)
         ]
 
+        print("Starting traffic to", client)
+
         process = subprocess.Popen(command)
         processes.append(process)
 
-    print("\nCongestion generated.")
     return processes
 
 
 def stop_congestion(processes):
-
-    print("\nStopping congestion...")
 
     for process in processes:
         process.terminate()
