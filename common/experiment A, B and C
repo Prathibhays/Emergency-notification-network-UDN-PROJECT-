@@ -1,207 +1,151 @@
-import socket
-import time
-import sys
 import csv
 import os
-import subprocess
+import statistics
 
 
-# -----------------------------
-# Configuration
-# -----------------------------
+RESULTS_DIR = "results"
 
-CLIENTS = {
-    "h2": "10.0.0.2",
-    "h3": "10.0.0.3",
-    "h4": "10.0.0.4"
-}
+CLIENT_FILES = [
+    "latency_client1.csv",
+    "latency_client2.csv",
+    "latency_client3.csv"
+]
 
-CLIENT_PORT = 6000
-EMERGENCY_PORT = 9999
 
-RESULT_FILE = "results/experiment_results.csv"
+def read_latencies():
 
+    values = []
 
-# -----------------------------
-# Send emergency notification
-# -----------------------------
+    for filename in CLIENT_FILES:
 
-def send_emergency():
+        path = os.path.join(RESULTS_DIR, filename)
 
-    message_id = str(int(time.time() * 1000))
+        if not os.path.exists(path):
+            continue
 
-    timestamp = time.time()
+        with open(path, "r", newline="") as file:
 
-    message = (
-        f"{message_id}|EMERGENCY|{timestamp}|"
-        f"FIRE DETECTED"
-    )
+            reader = csv.DictReader(file)
 
-    print("\n================================")
-    print("Sending emergency notification")
-    print("================================")
-    print("Message:", message)
+            for row in reader:
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                try:
+                    latency = float(row["latency_ms"])
+                    values.append(latency)
 
-    send_times = {}
+                except (ValueError, KeyError):
+                    pass
 
-    for client_name, client_ip in CLIENTS.items():
+    return values
 
-        send_times[client_name] = time.time()
 
-        sock.sendto(
-            message.encode(),
-            (client_ip, CLIENT_PORT)
-        )
+def calculate_average():
 
-        print(
-            f"Emergency sent to {client_name} "
-            f"({client_ip})"
-        )
+    values = read_latencies()
 
-    sock.close()
+    if not values:
+        return None
 
-    return message_id, send_times
+    return statistics.mean(values)
 
 
-# -----------------------------
-# Experiment A
-# -----------------------------
+def save_result(experiment, congestion, priority):
 
-def experiment_a():
+    values = read_latencies()
 
-    print("\n\n")
-    print("======================================")
-    print("EXPERIMENT A - NO CONGESTION")
-    print("======================================")
+    if values:
 
-    print("No background traffic")
-    print("Sending emergency traffic only")
-
-    message_id, send_times = send_emergency()
-
-    print("\nEmergency message sent.")
-    print("Wait for clients to report reception.")
-
-    return message_id
-
-
-# -----------------------------
-# Start congestion
-# -----------------------------
-
-def start_congestion():
-
-    print("\nStarting congestion...")
-
-    process = subprocess.Popen(
-        ["python3", "traffic/congestion.py"]
-    )
-
-    time.sleep(3)
-
-    return process
-
-
-# -----------------------------
-# Experiment B
-# -----------------------------
-
-def experiment_b():
-
-    print("\n\n")
-    print("==============================================")
-    print("EXPERIMENT B - CONGESTION WITHOUT SDN PRIORITY")
-    print("==============================================")
-
-    print("Starting heavy UDP background traffic...")
-
-    congestion_process = start_congestion()
-
-    time.sleep(2)
-
-    print("\nSending emergency traffic")
-    print("SDN priority: OFF")
-
-    message_id, send_times = send_emergency()
-
-    print("\nEmergency message sent during congestion.")
-
-    time.sleep(5)
-
-    congestion_process.terminate()
-
-    print("\nExperiment B finished.")
-
-    return message_id
-
-
-# -----------------------------
-# Experiment C
-# -----------------------------
-
-def experiment_c():
-
-    print("\n\n")
-    print("==============================================")
-    print("EXPERIMENT C - CONGESTION + SDN PRIORITY")
-    print("==============================================")
-
-    print("Starting heavy UDP background traffic...")
-
-    congestion_process = start_congestion()
-
-    time.sleep(2)
-
-    print("\nSending emergency traffic")
-    print("SDN priority: ON")
-
-    message_id, send_times = send_emergency()
-
-    print("\nEmergency message sent during congestion.")
-
-    time.sleep(5)
-
-    congestion_process.terminate()
-
-    print("\nExperiment C finished.")
-
-    return message_id
-
-
-# -----------------------------
-# Main
-# -----------------------------
-
-if __name__ == "__main__":
-
-    os.makedirs("results", exist_ok=True)
-
-    if len(sys.argv) != 2:
-
-        print("\nUsage:")
-        print("python3 experiments/run_experiment.py A")
-        print("python3 experiments/run_experiment.py B")
-        print("python3 experiments/run_experiment.py C")
-
-        sys.exit(1)
-
-    scenario = sys.argv[1].upper()
-
-    if scenario == "A":
-
-        experiment_a()
-
-    elif scenario == "B":
-
-        experiment_b()
-
-    elif scenario == "C":
-
-        experiment_c()
+        average = statistics.mean(values)
+        minimum = min(values)
+        maximum = max(values)
 
     else:
 
-        print("Invalid experiment.")
-        print("Use A, B or C.")
+        average = 0
+        minimum = 0
+        maximum = 0
+
+    path = os.path.join(
+        RESULTS_DIR,
+        "experiment_results.csv"
+    )
+
+    file_exists = os.path.exists(path)
+
+    with open(path, "a", newline="") as file:
+
+        writer = csv.writer(file)
+
+        if not file_exists:
+
+            writer.writerow([
+                "experiment",
+                "congestion",
+                "sdn_priority",
+                "packets_measured",
+                "average_latency_ms",
+                "minimum_latency_ms",
+                "maximum_latency_ms"
+            ])
+
+        writer.writerow([
+            experiment,
+            congestion,
+            priority,
+            len(values),
+            f"{average:.3f}",
+            f"{minimum:.3f}",
+            f"{maximum:.3f}"
+        ])
+
+    print()
+    print("=" * 60)
+    print(f"Experiment: {experiment}")
+    print("=" * 60)
+    print(f"Congestion       : {congestion}")
+    print(f"SDN priority     : {priority}")
+    print(f"Packets measured : {len(values)}")
+    print(f"Average latency  : {average:.3f} ms")
+    print(f"Minimum latency  : {minimum:.3f} ms")
+    print(f"Maximum latency  : {maximum:.3f} ms")
+
+
+def main():
+
+    print("1. Experiment A - No congestion")
+    print("2. Experiment B - Congestion without priority")
+    print("3. Experiment C - Congestion with SDN priority")
+
+    choice = input("\nSelect experiment: ").strip()
+
+    if choice == "1":
+
+        save_result(
+            "A",
+            "NO",
+            "NO"
+        )
+
+    elif choice == "2":
+
+        save_result(
+            "B",
+            "YES",
+            "NO"
+        )
+
+    elif choice == "3":
+
+        save_result(
+            "C",
+            "YES",
+            "YES"
+        )
+
+    else:
+
+        print("Invalid choice.")
+
+
+if __name__ == "__main__":
+    main()
