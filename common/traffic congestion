@@ -1,0 +1,29 @@
+import subprocess
+import time
+
+clients = [
+    "10.0.0.2",
+    "10.0.0.3",
+    "10.0.0.4"
+]
+
+processes = []
+
+for client in clients:
+
+    cmd = [
+        "iperf3",
+        "-c", client,
+        "-u",
+        "-b", "5M",
+        "-t", "30"
+    ]
+
+    p = subprocess.Popen(cmd)
+    processes.append(p)
+
+print("Heavy UDP traffic started")
+
+time.sleep(30)
+
+print("Congestion experiment finished")
