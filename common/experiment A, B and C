@@ -1,0 +1,207 @@
+import socket
+import time
+import sys
+import csv
+import os
+import subprocess
+
+
+# -----------------------------
+# Configuration
+# -----------------------------
+
+CLIENTS = {
+    "h2": "10.0.0.2",
+    "h3": "10.0.0.3",
+    "h4": "10.0.0.4"
+}
+
+CLIENT_PORT = 6000
+EMERGENCY_PORT = 9999
+
+RESULT_FILE = "results/experiment_results.csv"
+
+
+# -----------------------------
+# Send emergency notification
+# -----------------------------
+
+def send_emergency():
+
+    message_id = str(int(time.time() * 1000))
+
+    timestamp = time.time()
+
+    message = (
+        f"{message_id}|EMERGENCY|{timestamp}|"
+        f"FIRE DETECTED"
+    )
+
+    print("\n================================")
+    print("Sending emergency notification")
+    print("================================")
+    print("Message:", message)
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    send_times = {}
+
+    for client_name, client_ip in CLIENTS.items():
+
+        send_times[client_name] = time.time()
+
+        sock.sendto(
+            message.encode(),
+            (client_ip, CLIENT_PORT)
+        )
+
+        print(
+            f"Emergency sent to {client_name} "
+            f"({client_ip})"
+        )
+
+    sock.close()
+
+    return message_id, send_times
+
+
+# -----------------------------
+# Experiment A
+# -----------------------------
+
+def experiment_a():
+
+    print("\n\n")
+    print("======================================")
+    print("EXPERIMENT A - NO CONGESTION")
+    print("======================================")
+
+    print("No background traffic")
+    print("Sending emergency traffic only")
+
+    message_id, send_times = send_emergency()
+
+    print("\nEmergency message sent.")
+    print("Wait for clients to report reception.")
+
+    return message_id
+
+
+# -----------------------------
+# Start congestion
+# -----------------------------
+
+def start_congestion():
+
+    print("\nStarting congestion...")
+
+    process = subprocess.Popen(
+        ["python3", "traffic/congestion.py"]
+    )
+
+    time.sleep(3)
+
+    return process
+
+
+# -----------------------------
+# Experiment B
+# -----------------------------
+
+def experiment_b():
+
+    print("\n\n")
+    print("==============================================")
+    print("EXPERIMENT B - CONGESTION WITHOUT SDN PRIORITY")
+    print("==============================================")
+
+    print("Starting heavy UDP background traffic...")
+
+    congestion_process = start_congestion()
+
+    time.sleep(2)
+
+    print("\nSending emergency traffic")
+    print("SDN priority: OFF")
+
+    message_id, send_times = send_emergency()
+
+    print("\nEmergency message sent during congestion.")
+
+    time.sleep(5)
+
+    congestion_process.terminate()
+
+    print("\nExperiment B finished.")
+
+    return message_id
+
+
+# -----------------------------
+# Experiment C
+# -----------------------------
+
+def experiment_c():
+
+    print("\n\n")
+    print("==============================================")
+    print("EXPERIMENT C - CONGESTION + SDN PRIORITY")
+    print("==============================================")
+
+    print("Starting heavy UDP background traffic...")
+
+    congestion_process = start_congestion()
+
+    time.sleep(2)
+
+    print("\nSending emergency traffic")
+    print("SDN priority: ON")
+
+    message_id, send_times = send_emergency()
+
+    print("\nEmergency message sent during congestion.")
+
+    time.sleep(5)
+
+    congestion_process.terminate()
+
+    print("\nExperiment C finished.")
+
+    return message_id
+
+
+# -----------------------------
+# Main
+# -----------------------------
+
+if __name__ == "__main__":
+
+    os.makedirs("results", exist_ok=True)
+
+    if len(sys.argv) != 2:
+
+        print("\nUsage:")
+        print("python3 experiments/run_experiment.py A")
+        print("python3 experiments/run_experiment.py B")
+        print("python3 experiments/run_experiment.py C")
+
+        sys.exit(1)
+
+    scenario = sys.argv[1].upper()
+
+    if scenario == "A":
+
+        experiment_a()
+
+    elif scenario == "B":
+
+        experiment_b()
+
+    elif scenario == "C":
+
+        experiment_c()
+
+    else:
+
+        print("Invalid experiment.")
+        print("Use A, B or C.")
