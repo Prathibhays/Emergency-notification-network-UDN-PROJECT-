@@ -1,0 +1,70 @@
+import csv
+import os
+import matplotlib.pyplot as plt
+
+
+RESULT_FILE = "results/experiment_results.csv"
+GRAPH_DIR = "graphs"
+
+
+def read_results():
+
+    experiments = []
+    latency = []
+
+    with open(RESULT_FILE, "r") as file:
+
+        reader = csv.DictReader(file)
+
+        for row in reader:
+
+            experiments.append(
+                row["experiment"]
+            )
+
+            latency.append(
+                float(row["average_latency_ms"])
+            )
+
+    return experiments, latency
+
+
+def create_graph():
+
+    experiments, latency = read_results()
+
+    if not experiments:
+
+        print("No experiment results found.")
+
+        return
+
+    os.makedirs(GRAPH_DIR, exist_ok=True)
+
+    plt.figure()
+
+    plt.bar(
+        experiments,
+        latency
+    )
+
+    plt.xlabel("Experiment")
+    plt.ylabel("Average Emergency Latency (ms)")
+    plt.title("Emergency Notification Latency")
+
+    plt.tight_layout()
+
+    output = os.path.join(
+        GRAPH_DIR,
+        "latency_comparison.png"
+    )
+
+    plt.savefig(output)
+
+    plt.close()
+
+    print(f"Graph saved: {output}")
+
+
+if __name__ == "__main__":
+    create_graph()

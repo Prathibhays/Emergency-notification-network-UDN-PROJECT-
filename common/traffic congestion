@@ -1,0 +1,87 @@
+import subprocess
+import time
+import sys
+
+
+CLIENTS = [
+    "10.0.0.2",
+    "10.0.0.3",
+    "10.0.0.4"
+]
+
+BANDWIDTH = "5M"
+DURATION = 30
+
+
+def start_congestion():
+
+    processes = []
+
+    print("=" * 60)
+    print("STARTING CONGESTION")
+    print("=" * 60)
+
+    for client in CLIENTS:
+
+        command = [
+            "iperf3",
+            "-c",
+            client,
+            "-u",
+            "-b",
+            BANDWIDTH,
+            "-t",
+            str(DURATION)
+        ]
+
+        print(f"h1 -> {client}: {BANDWIDTH}")
+
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        processes.append(process)
+
+    print(f"\nCongestion running for {DURATION} seconds.")
+
+    return processes
+
+
+def stop_congestion(processes):
+
+    for process in processes:
+
+        if process.poll() is None:
+            process.terminate()
+
+    print("Congestion stopped.")
+
+
+def main():
+
+    processes = start_congestion()
+
+    try:
+
+        for remaining in range(DURATION, 0, -1):
+
+            print(
+                f"\rCongestion remaining: {remaining:2d}s",
+                end=""
+            )
+
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+
+        print("\nInterrupted.")
+
+    finally:
+
+        stop_congestion(processes)
+
+
+if __name__ == "__main__":
+    main()

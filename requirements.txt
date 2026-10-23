@@ -1,0 +1,2 @@
+# Person 1 application uses only Python standard-library modules.
+# No pip packages are required for the UDP server/client.

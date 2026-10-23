@@ -1,0 +1,2 @@
+# SDN controller dependencies for the OS-Ken-based controller
+os-ken>=4.2.2
