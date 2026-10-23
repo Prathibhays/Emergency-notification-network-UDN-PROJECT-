@@ -1,4 +1,4 @@
-"""Ryu SDN controller for the UDP emergency notification network.
+"""OS-Ken SDN controller for the UDP emergency notification network.
 
 Person 2 component:
 - Detects switches and installs a table-miss rule
@@ -10,24 +10,24 @@ Person 2 component:
 - Periodically logs flow statistics per traffic class
 
 Run:
-    ryu-manager controller/emergency_controller.py
+    osken-manager controller.emergency_controller
 """
 
 import csv
 import os
 import time
 
-from ryu.base import app_manager
-from ryu.controller import ofp_event
-from ryu.controller.handler import (
+from os_ken.base import app_manager
+from os_ken.controller import ofp_event
+from os_ken.controller.handler import (
     CONFIG_DISPATCHER,
     DEAD_DISPATCHER,
     MAIN_DISPATCHER,
     set_ev_cls,
 )
-from ryu.lib import hub
-from ryu.lib.packet import ether_types, ethernet, in_proto, ipv4, packet, udp
-from ryu.ofproto import ofproto_v1_3
+from os_ken.lib import hub
+from os_ken.lib.packet import ether_types, ethernet, in_proto, ipv4, packet, udp
+from os_ken.ofproto import ofproto_v1_3
 
 from traffic_classifier import ALL_CLASSES, OTHER, class_for_priority, classify_udp
 
@@ -42,7 +42,7 @@ RESULTS_DIR = os.path.join(
 STATS_CSV = os.path.join(RESULTS_DIR, "sdn_flow_stats.csv")
 
 
-class EmergencyController(app_manager.RyuApp):
+class EmergencyController(app_manager.OSKenApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
