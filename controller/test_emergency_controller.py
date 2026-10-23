@@ -16,14 +16,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import traffic_classifier as tc  # noqa: E402
 
 try:
-    from ryu.controller import ofp_event
-    from ryu.lib.packet import arp, ethernet, ether_types, in_proto, ipv4, packet, tcp, udp
-    from ryu.ofproto import ofproto_v1_3, ofproto_v1_3_parser
+    from os_ken.controller import ofp_event
+    from os_ken.lib.packet import arp, ethernet, ether_types, in_proto, ipv4, packet, tcp, udp
+    from os_ken.ofproto import ofproto_v1_3, ofproto_v1_3_parser
 
     import emergency_controller
-    HAVE_RYU = True
+    HAVE_OS_KEN = True
 except ImportError:
-    HAVE_RYU = False
+    HAVE_OS_KEN = False
 
 H1_MAC, H1_IP = "00:00:00:00:00:01", "10.0.0.1"  # server
 H2_MAC, H2_IP = "00:00:00:00:00:02", "10.0.0.2"  # client
@@ -62,7 +62,7 @@ class FakeDatapath:
         self.sent.append(msg)
 
 
-@unittest.skipUnless(HAVE_RYU, "Ryu is not installed")
+@unittest.skipUnless(HAVE_OS_KEN, "OS-Ken is not installed")
 class ControllerTest(unittest.TestCase):
     def setUp(self):
         emergency_controller.STATS_INTERVAL = 0
