@@ -1,125 +1,117 @@
 # Person 2 — SDN Controller (OS-Ken)
 
-The controller makes the network recognise emergency UDP traffic and give it priority.
+The SDN controller identifies emergency UDP traffic and assigns it a higher forwarding priority than normal and background traffic.
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `emergency_controller.py` | OS-Ken app: switch handling, L2 forwarding, UDP classification, priority flows, queue mapping, flow stats |
-| `traffic_classifier.py` | Port → traffic-class rules (no OS-Ken dependency) |
-| `test_emergency_controller.py` | Offline tests using simulated OpenFlow messages |
+| File                           | Purpose                                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `emergency_controller.py`      | OS-Ken controller application, OpenFlow switch handling, learning-switch forwarding, UDP classification, priority rules, queue mapping and flow statistics |
+| `traffic_classifier.py`        | Classifies traffic based on protocol and UDP ports without depending on OS-Ken                                                                             |
+| `test_emergency_controller.py` | Offline unit tests for controller classification and flow handling                                                                                         |
+| `requirements.txt`             | Python dependencies for the controller                                                                                                                     |
 
-## Classification
+## Traffic Classification
 
-Ports match `common/protocol.py` from the UDP application.
+The port numbers correspond to `common/protocol.py` in the UDP notification application.
 
-| UDP port | Class | Flow priority | Level | OVS queue | DSCP |
-|---|---|---|---|---|---|
-| dst 9999 | EMERGENCY | 100 | HIGH | 1 | 46 (EF) |
-| dst/src 5001 (register + ACK) | CONTROL | 50 | MEDIUM | 1 | – |
-| dst 5000 | NORMAL | 10 | NORMAL | 0 | – |
-| any other UDP (e.g. iperf) | BACKGROUND | 5 | LOW | 0 | – |
-| non-UDP IP (ICMP, TCP) | OTHER | 1 | LOW | – | – |
-| table-miss | → controller | 0 | | | |
+| Traffic    | Match                               | Flow priority | Level  | OVS queue | DSCP    |
+| ---------- | ----------------------------------- | ------------: | ------ | --------: | ------- |
+| Emergency  | UDP destination port 9999           |           100 | HIGH   |         1 | 46 (EF) |
+| Control    | UDP source or destination port 5001 |            50 | MEDIUM |         1 | —       |
+| Normal     | UDP destination port 5000           |            10 | NORMAL |         0 | —       |
+| Background | Other UDP traffic                   |             5 | LOW    |         0 | —       |
+| Other      | Non-UDP IP traffic                  |             1 | LOW    |         — | —       |
+| Table miss | Unmatched packets                   |             0 | —      |         — | —       |
 
-How it works:
+## How It Works
 
-1. When a switch connects, the controller installs a table-miss rule that sends unknown packets to the controller.
-2. For each new UDP flow, the controller reads the destination port, classifies it, and logs the result.
-3. It then installs an OpenFlow 1.3 rule matching that flow (in_port, IPs, UDP ports) at the class priority. The rule applies `set_queue`, applies `set_field ip_dscp` for emergency traffic, and outputs to the learned port.
-4. Non-UDP rules are pinned to their IP protocol, so they never shadow a UDP flow that still needs classifying.
-5. Every 10 s the controller requests flow stats and logs packets and bytes per class. It also appends them to `results/sdn_flow_stats.csv` for graphs.
+1. When a switch connects, the controller installs a table-miss rule that sends unmatched packets to the controller.
+2. The controller examines new packets and classifies UDP traffic using the configured ports.
+3. It installs OpenFlow rules with the appropriate traffic priority and forwarding actions.
+4. Emergency traffic receives queue 1 and DSCP 46 when supported by the switch and configured QoS queues.
+5. The controller learns MAC addresses and forwards packets through the appropriate switch ports.
+6. Periodically, the controller requests flow statistics and records traffic information in `results/sdn_flow_stats.csv`, if implemented in the controller code.
 
-Constants (ports, queue IDs, timeouts, stats interval) are at the top of the two `.py` files.
+## Prerequisites
 
-## Setup (Ubuntu VM)
+- Kali Linux or Ubuntu
+- Mininet
+- Open vSwitch
+- Python
+- OS-Ken compatible with the Python environment
 
-OS-Ken needs Python 3.8 or 3.9. Newer Python versions break its `eventlet` dependency.
+The controller must use the same OpenFlow version and listening port as Mininet. This project uses OpenFlow 1.3 and port 6633 in the tested setup.
 
-```bash
-sudo apt install python3.9 python3.9-venv mininet openvswitch-switch
-python3.9 -m venv ~/ryu-venv
-source ~/ryu-venv/bin/activate
-pip install "setuptools<58" wheel pbr
-pip install --no-build-isolation -r controller/requirements.txt
-```
+## Run the Controller
 
-## Run
-
-From the project root:
+From the project root, activate the Python environment that contains the working OS-Ken installation and run:
 
 ```bash
-osken-manager controller/emergency_controller.py
+source ~/osken-venv/bin/activate
+cd ~/Desktop/Emergency-notification-network-UDN-PROJECT--main
 ```
 
-## Test with Mininet
-
-Terminal 1 (controller):
+Use the controller launcher available in your installed OS-Ken version. If `osken-manager` is installed:
 
 ```bash
 osken-manager controller/emergency_controller.py
 ```
 
-Terminal 2 (network; Person 3's topology replaces this simple one):
+OS-Ken 4.x releases may not provide the older `osken-manager` command. Do not assume the command exists; use the launcher compatible with your installed version.
+
+## Run Mininet
+
+In a separate terminal:
 
 ```bash
-sudo mn --topo single,4 --mac --switch ovsk,protocols=OpenFlow13 --controller remote,ip=127.0.0.1,port=6653
+sudo systemctl start openvswitch-switch
+sudo mn -c
+sudo mn --topo single,4 --mac --switch ovsk,protocols=OpenFlow13 --controller remote,ip=127.0.0.1,port=6633
 ```
 
-Inside Mininet:
+At the Mininet prompt:
 
-```
-mininet> pingall
-mininet> h1 python3 -m server.notification_server &      # or use xterm h1
-mininet> h2 python3 -m client.notification_client --id client1 --server 10.0.0.1 &
+```text
+pingall
 ```
 
-Send `emergency Fire in Block A` and `normal Test message` from the server, then check the installed flows:
+All hosts should be able to reach one another when the controller and forwarding rules are working.
+
+## Inspect OpenFlow Rules
+
+In another terminal:
 
 ```bash
 sudo ovs-ofctl -O OpenFlow13 dump-flows s1
 ```
 
-Emergency flows show `priority=100,udp,...,tp_dst=9999 actions=set_queue:1,set_field:46->ip_dscp,output:N`.
-Normal flows show `priority=10`.
+Generate traffic before checking for classification rules. A table-miss rule alone does not demonstrate that emergency-specific rules were installed.
 
-Quick test without the app:
+## Run the Offline Tests
 
-```
-mininet> h2 nc -u -l 9999 &
-mininet> h1 bash -c 'echo test | nc -u -w1 10.0.0.2 9999'
-```
-
-## Offline tests (no Mininet needed)
+From the project root, using the project's Python environment:
 
 ```bash
 python -m unittest controller/test_emergency_controller.py -v
 ```
 
-## Notes for Person 3 (queues / QoS)
+## QoS Notes
 
-- Emergency traffic and ACKs go to **queue 1**. Normal and background traffic go to **queue 0**.
-- Configure queue 1 with a high guaranteed rate on each switch port. Example for a 10 Mbit/s link:
+- Emergency and control traffic are assigned queue 1 by the controller.
+- Normal and background traffic are assigned queue 0.
+- The queues must be configured on the relevant Open vSwitch ports for queue selection to have an effect.
+- Flow priority and queue assignment are separate: a higher OpenFlow priority determines which rule matches, while QoS configuration determines queue treatment.
+- Use a loop-free topology unless the controller implements loop prevention or spanning-tree support.
 
-```bash
-sudo ovs-vsctl -- set port s1-eth2 qos=@q -- --id=@q create qos type=linux-htb \
-  other-config:max-rate=10000000 queues:0=@q0 queues:1=@q1 \
-  -- --id=@q0 create queue other-config:max-rate=10000000 \
-  -- --id=@q1 create queue other-config:min-rate=8000000 other-config:max-rate=10000000
-```
+## Testing Checklist
 
-- If no queues are configured, `set_queue` has no effect, and the flow-priority classification still works.
-- Use Mininet links with bandwidth limits (`TCLink`, `bw=10`) and generate congestion with iperf UDP on another port, e.g. `iperf -u -c 10.0.0.2 -b 20M -p 5201`. That traffic is classified BACKGROUND.
-- The topology must be loop-free (single or tree), because the controller is a learning switch without STP.
-
-## Testing checklist
-
-- [x] OS-Ken starts
-- [x] Switch connects (table-miss installed)
-- [x] Normal UDP traffic is detected
-- [x] Emergency UDP traffic is detected
-- [x] Emergency receives higher flow priority
-- [x] Flow rules are installed
-- [x] Packets are forwarded correctly
-- [x] Controller logs classification
+- [ ] Controller starts without errors.
+- [ ] Switch connects using OpenFlow 1.3.
+- [ ] `pingall` succeeds.
+- [ ] Normal UDP traffic is classified.
+- [ ] Emergency UDP traffic on port 9999 is classified.
+- [ ] Emergency flow rules use higher priority than normal traffic.
+- [ ] Forwarding works after rules are installed.
+- [ ] Flow statistics are recorded when statistics logging is implemented.
+- [ ] QoS queues are configured and verified before claiming preferential queue treatment.
