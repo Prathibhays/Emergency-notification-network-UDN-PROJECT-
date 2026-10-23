@@ -1,3 +1,2 @@
-# SDN controller (Person 2). Ryu works best on Python 3.8 / 3.9.
-ryu==4.34
-eventlet==0.30.2
+# SDN controller dependencies for the OS-Ken-based controller
+os-ken>=2.10.1
